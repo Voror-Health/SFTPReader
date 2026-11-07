@@ -52,7 +52,7 @@ public interface DataLayerI {
 
     List<String> getNotifiedMessages(BatchSplit batchSplit) throws Exception;
 
-    ConfigurationPollingAttempt getLastPollingAttempt(String configurationId) throws Exception;
+    List<ConfigurationPollingAttempt> getLastPollingAttempts(String configurationId, int limit) throws Exception;
     void savePollingAttempt(ConfigurationPollingAttempt attempt) throws Exception;
 
     Set<String> getAdastraOdsCodes(String configurationId, String filenameOrgCode) throws Exception;

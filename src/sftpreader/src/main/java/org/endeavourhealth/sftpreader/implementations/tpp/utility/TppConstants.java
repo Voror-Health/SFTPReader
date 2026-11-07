@@ -14,9 +14,13 @@ public class TppConstants {
     public static final String PATIENT_REGISTRATION_FILE = "SRPatientRegistration.csv";
     public static final String PATIENT_FILE = "SRPatient.csv";
     public static final String CODE_FILE = "SRCode.csv";
+    public static final String EVENT_FILE = "SREvent.csv";
 
     //note these are file TYPES, not file names
     public static final String FILE_ID_PATIENT = "Patient";
+    public static final String FILE_ID_PATIENT_ADDRESS_HISTORY = "PatientAddressHistory";
+    public static final String FILE_ID_PATIENT_CONTACT_DETAILS = "PatientContactDetails";
+    public static final String FILE_ID_PATIENT_REGISTRATION = "PatientRegistration";
     public static final String FILE_ID_EVENT = "Event";
     public static final String FILE_ID_CODE = "Code";
     public static final String FILE_ID_MANIFEST = "Manifest";

@@ -2,13 +2,13 @@ package org.endeavourhealth.sftpreader.implementations;
 
 import com.google.common.base.Strings;
 import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.endeavourhealth.common.utility.FileHelper;
 import org.endeavourhealth.common.utility.FileInfo;
 import org.endeavourhealth.common.utility.JsonSerializer;
 import org.endeavourhealth.sftpreader.model.DataLayerI;
-
-import org.endeavourhealth.sftpreader.model.db.*;
+import org.endeavourhealth.sftpreader.model.db.BatchSplit;
+import org.endeavourhealth.sftpreader.model.db.DbConfiguration;
+import org.endeavourhealth.sftpreader.model.db.DbInstanceEds;
 import org.endeavourhealth.sftpreader.utilities.ExchangePayloadFile;
 import org.endeavourhealth.sftpreader.utilities.RemoteFile;
 import org.slf4j.LoggerFactory;
@@ -81,15 +81,15 @@ public abstract class SftpNotificationCreator {
                 }
             }
 
-            //substring by the shared path PLUS ONE to remove the separator after it
-            file = file.substring(sharedStoragePath.length()+1);
-
             //use the file name parser to work out the file type again
             LocalDateTime ldt = LocalDateTime.ofInstant(lastModified.toInstant(), ZoneId.systemDefault());
             RemoteFile remoteFile = new RemoteFile(file, size, ldt);
             SftpFilenameParser filenameParser = ImplementationActivator.createFilenameParser(false, remoteFile, dbConfiguration);
             String fileType = filenameParser.generateFileTypeIdentifier();
 
+            //substring by the shared path PLUS ONE to remove the separator after it
+            //moved here so NEMS files can still be read in createFilenameParser above
+            file = file.substring(sharedStoragePath.length()+1);
             ret.add(new ExchangePayloadFile(file, new Long(size), fileType));
         }
 

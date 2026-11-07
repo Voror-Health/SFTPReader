@@ -15,10 +15,7 @@ import org.endeavourhealth.common.config.ConfigManagerException;
 import org.endeavourhealth.common.ods.OdsOrganisation;
 import org.endeavourhealth.common.ods.OdsWebService;
 import org.endeavourhealth.common.security.keycloak.client.KeycloakClient;
-import org.endeavourhealth.common.utility.FileHelper;
-import org.endeavourhealth.common.utility.FileInfo;
-import org.endeavourhealth.common.utility.MetricsHelper;
-import org.endeavourhealth.common.utility.SlackHelper;
+import org.endeavourhealth.common.utility.*;
 import org.endeavourhealth.core.application.ApplicationHeartbeatHelper;
 import org.endeavourhealth.core.database.dal.usermanager.caching.OrganisationCache;
 import org.endeavourhealth.core.database.rdbms.ConnectionManager;
@@ -41,6 +38,7 @@ import org.endeavourhealth.sftpreader.implementations.emis.utility.EmisFixDisabl
 import org.endeavourhealth.sftpreader.implementations.emis.utility.EmisHelper;
 import org.endeavourhealth.sftpreader.implementations.emisCustom.EmisCustomBulkDetector;
 import org.endeavourhealth.sftpreader.implementations.emisCustom.utility.EmisCustomConstants;
+import org.endeavourhealth.sftpreader.implementations.imperial.ImperialBulkDetector;
 import org.endeavourhealth.sftpreader.implementations.tpp.TppBulkDetector;
 import org.endeavourhealth.sftpreader.implementations.tpp.TppDateDetector;
 import org.endeavourhealth.sftpreader.implementations.tpp.utility.TppConstants;
@@ -88,6 +86,21 @@ public class Main {
                 //but support getting it via VM property for legacy support
                 instanceName = System.getProperty("INSTANCE_NAME");
             }
+
+            //new utility method which uses no config to directly decrypt using key files
+            if (args.length > 1) {
+                if (args[1].equalsIgnoreCase("DecryptGpg2")) {
+                    String srcFilePath = args[2];
+                    String dstFilePath = args[3];
+                    String keyPrivateFile = args[4];
+                    String keyPrivatePW = args[5];
+                    String keyPublicFile = args[6];
+
+                    decryptGpgFile2(srcFilePath, dstFilePath, keyPrivateFile, keyPrivatePW, keyPublicFile);
+                    System.exit(0);
+                }
+            }
+
             ConfigManager.initialize("sftpreader", instanceName);
 
             configuration = Configuration.getInstance();
@@ -265,6 +278,17 @@ public class Main {
                     System.exit(0);
                 }
 
+                if (args.length > 1
+                        && args[1].equalsIgnoreCase("loadTppSREvent")) {
+                    String configurationId = args[2];
+                    String odsCodeRegex = null;
+                    if (args.length > 3) {
+                        odsCodeRegex = args[3];
+                    }
+                    SRCodeLoader.loadTppSREventIntoHashTable(configuration, configurationId, odsCodeRegex);
+                    System.exit(0);
+                }
+
                 //testing SQL connection to DSM
                 if (args.length > 1
                         && args[1].equalsIgnoreCase("checkDpa")) {
@@ -347,7 +371,7 @@ public class Main {
             SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, "Test Message from SFTP Reader for Alerts channel");
 
             LOG.debug("Testing ODS search");
-            Proxy proxy = SlackHelper.getProxy();
+            Proxy proxy = InternetProxyHelper.getProxy();
             OdsOrganisation r = OdsWebService.lookupOrganisationViaRest("F84062", proxy);
             LOG.debug("Got result " + (r == null? "null" : r.getOrganisationName()));
 
@@ -621,6 +645,9 @@ public class Main {
                             }
 
                         } else if (bulkDetector instanceof BartsBulkDetector) {
+                            hasPatientData = bulkDetector.hasPatientData(b, split, dataLayer, edsConfiguration, dbConfiguration);
+
+                        } else if (bulkDetector instanceof ImperialBulkDetector) {
                             hasPatientData = bulkDetector.hasPatientData(b, split, dataLayer, edsConfiguration, dbConfiguration);
 
                         } else if (bulkDetector instanceof BhrutBulkDetector) {
@@ -1646,6 +1673,43 @@ public class Main {
             }
 
             LOG.info("Finished Decrypting " + srcFilePath + " to " + dstFilePath + " from configuration " + configurationId);
+        } catch (Throwable t) {
+            LOG.error("", t);
+        }
+    }
+
+    private static void decryptGpgFile2(String srcFilePath, String dstFilePath, String keyPrivateFile, String keyPrivatePW, String keyPublicFile) {
+        LOG.info("Decrypting " + srcFilePath + " to " + dstFilePath);
+        try {
+
+            InputStream inputStream = FileHelper.readFileFromSharedStorage(srcFilePath);
+
+            File privateKeyFile = new File(keyPrivateFile);
+            String privateKey = FileHelper.readTextFile(privateKeyFile.toPath());
+
+            File publicKeyFile = new File(keyPublicFile);
+            String publicKey = FileHelper.readTextFile(publicKeyFile.toPath());
+
+            //delete destination file and make sure directories exist
+            File dstFile = new File(dstFilePath);
+            if (dstFile.exists()) {
+                dstFile.delete();
+            } else {
+                File dstDir = dstFile.getParentFile();
+                if (dstDir != null && !dstDir.exists()) {
+                    dstDir.mkdirs();
+                }
+            }
+
+            try {
+                LOG.debug("Opened input stream");
+                PgpUtil.decryptAndVerify(inputStream, dstFilePath, privateKey, keyPrivatePW, publicKey);
+
+            } finally {
+                inputStream.close();
+            }
+
+            LOG.info("Finished Decrypting " + srcFilePath + " to " + dstFilePath);
         } catch (Throwable t) {
             LOG.error("", t);
         }

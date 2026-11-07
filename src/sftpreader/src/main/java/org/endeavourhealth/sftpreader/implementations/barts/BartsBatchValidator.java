@@ -1,18 +1,13 @@
 package org.endeavourhealth.sftpreader.implementations.barts;
 
-import com.google.common.base.Strings;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.Validate;
 import org.endeavourhealth.common.utility.FileHelper;
 import org.endeavourhealth.common.utility.SlackHelper;
 import org.endeavourhealth.sftpreader.SftpFile;
 import org.endeavourhealth.sftpreader.implementations.ImplementationActivator;
-import org.endeavourhealth.sftpreader.implementations.SftpFilenameParser;
-import org.endeavourhealth.sftpreader.implementations.emis.EmisFilenameParser;
-import org.endeavourhealth.sftpreader.implementations.emis.utility.EmisHelper;
-import org.endeavourhealth.sftpreader.model.DataLayerI;
-
 import org.endeavourhealth.sftpreader.implementations.SftpBatchValidator;
+import org.endeavourhealth.sftpreader.implementations.SftpFilenameParser;
+import org.endeavourhealth.sftpreader.model.DataLayerI;
 import org.endeavourhealth.sftpreader.model.db.Batch;
 import org.endeavourhealth.sftpreader.model.db.BatchFile;
 import org.endeavourhealth.sftpreader.model.db.DbConfiguration;
@@ -28,8 +23,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class BartsBatchValidator extends SftpBatchValidator {
 
@@ -224,6 +219,9 @@ public class BartsBatchValidator extends SftpBatchValidator {
 
             } else if (fileType.equals(BartsFilenameParser.TYPE_EMERGENCY_CARE)) {
                 tailsFileType = BartsFilenameParser.TYPE_EMERGENCY_CARE_TAILS;
+
+            } else if (fileType.equals(BartsFilenameParser.TYPE_EMERGENCY_CARE_V2)) {
+                tailsFileType = BartsFilenameParser.TYPE_EMERGENCY_CARE_TAILS_V2;
 
             } else if (fileType.equals(BartsFilenameParser.TYPE_2_1_SUSAEA)) {
                 tailsFileType = BartsFilenameParser.TYPE_2_1_TAILAEA;

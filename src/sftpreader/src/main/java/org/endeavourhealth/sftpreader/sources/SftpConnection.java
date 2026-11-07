@@ -2,7 +2,6 @@ package org.endeavourhealth.sftpreader.sources;
 
 import com.google.common.base.Strings;
 import com.jcraft.jsch.*;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.endeavourhealth.sftpreader.utilities.RemoteFile;
@@ -13,10 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
-import java.util.List;
-import java.util.Vector;
-import java.util.stream.Collectors;
+import java.util.*;
 
 public class SftpConnection extends Connection {
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(SftpConnection.class);
@@ -120,7 +116,10 @@ public class SftpConnection extends Connection {
         }
     }
 
+
     @SuppressWarnings("unchecked")
+
+    //THIS METHOD CHANGE (including new version of getFile) WAS FOR THE EMIS AWS MIGRATION.  WORKS FOR THAT BUT NOT FOR CURRENT FEED
     public List<RemoteFile> getFileList(String remotePath) throws SftpException {
 
         //an error is raised if we try to list the files without first changing into the directory
@@ -130,45 +129,96 @@ public class SftpConnection extends Connection {
         Vector<ChannelSftp.LsEntry> fileList = channel.ls(".");
         //Vector<ChannelSftp.LsEntry> fileList = channel.ls("\\");
 
-        return fileList
-                .stream()
-                .filter(t -> !t.getAttrs().isDir())
-                .map(t ->
-                        new RemoteFile(t.getFilename(),
-                                t.getAttrs().getSize(),
-                                LocalDateTime.ofInstant(new Date((long)t.getAttrs().getMTime() * 1000L).toInstant(), ZoneId.systemDefault())
-                        )
-                )
-                .collect(Collectors.toList());
+        //temporary debug for listing files out
+//        List<String> sftpListing = new ArrayList<>();
+//        for (ChannelSftp.LsEntry entry: fileList) {
+//            sftpListing.add(entry.getFilename() + "("+entry.getAttrs().getSize()+" bytes)" + " isDir? -> "+entry.getAttrs().isDir());
+//        }
+//        Arrays.sort(sftpListing.toArray());
+//        LOG.debug(remotePath+" --> file listing: ");
+//        LOG.debug(String.join("\r\n", sftpListing));
+        ///////////////////////////////////
+
+        List<RemoteFile> ret = new ArrayList<>();
+
+        for (ChannelSftp.LsEntry entry: fileList) {
+            if (entry.getAttrs().isDir()) {
+                //for any directory found, recurse and get a listing of the subdirectory
+                String dirName = entry.getFilename();
+                //ignore . and .. as a directory to prevent endless loop when starting in a sub directory
+                if (dirName.equalsIgnoreCase(".") || dirName.equalsIgnoreCase("..")) {
+                    continue;
+                }
+                //LOG.debug("Directory found: "+dirName);
+
+                List<RemoteFile> childList = getFileList(dirName);
+
+                //need to prefix the object file name with the path
+                for (RemoteFile childEntry: childList) {
+                    //have to manually use the Linux file separator so this code will work on Windows
+                    String path = dirName + "/" + childEntry.getFullPath();
+
+                    //LOG.debug("Directory file entry found: "+path);
+
+                    //String path = FilenameUtils.concat(dirName, childEntry.getFullPath());
+                    RemoteFile f = new RemoteFile(path, childEntry.getFileSizeBytes(), childEntry.getLastModified());
+
+                    //LOG.debug("Directory file entry added");
+
+                    ret.add(f);
+                }
+
+                //step back out of the sub-directory
+                channel.cd("..");
+
+            } else {
+
+                //LOG.debug("Non directory file entry found: "+entry.getFilename());
+
+                RemoteFile f = new RemoteFile(entry.getFilename(),
+                        entry.getAttrs().getSize(),
+                        LocalDateTime.ofInstant(new Date((long)entry.getAttrs().getMTime() * 1000L).toInstant(), ZoneId.systemDefault()));
+                ret.add(f);
+
+                //LOG.debug("Non directory file entry added");
+            }
+        }
+
+        return ret;
     }
 
-    /*@SuppressWarnings("unchecked")
-    public List<RemoteFile> getFileList(String remotePath) throws SftpException {
-
-        Vector<ChannelSftp.LsEntry> fileList = channel.ls(remotePath);
-
-        return fileList
-                .stream()
-                .filter(t -> !t.getAttrs().isDir())
-                .map(t ->
-                        new RemoteFile(t.getFilename(),
-                                remotePath,
-                                t.getAttrs().getSize(),
-                                LocalDateTime.ofInstant(new Date((long)t.getAttrs().getMTime() * 1000L).toInstant(), ZoneId.systemDefault())
-                        )
-                )
-                .collect(Collectors.toList());
-    }*/
-
+    //AWS and current feed version, gets explicit remote file regardless of position in folder
     public InputStream getFile(String remotePath) throws SftpException {
-
-        //when listing the files we change into the directory, so want to remove the path and just download by filename
-        /*File f = new File(remotePath);
-        String name = f.getName();*/
-        String name = FilenameUtils.getName(remotePath);
-
-        return channel.get(name);
+        return channel.get(remotePath);
     }
+
+    //Current feed version - single fileList stream, no directories handled
+//    public List<RemoteFile> getFileList(String remotePath) throws SftpException {
+//
+//        //an error is raised if we try to list the files without first changing into the directory
+//        channel.cd(remotePath);
+//
+//        //trying alternatives that work on all known SFTP servers
+//        Vector<ChannelSftp.LsEntry> fileList = channel.ls(".");
+//        //Vector<ChannelSftp.LsEntry> fileList = channel.ls("\\");
+//
+//        return fileList
+//                .stream()
+//                .filter(t -> !t.getAttrs().isDir())
+//                .map(t ->
+//                        new RemoteFile(t.getFilename(),
+//                                t.getAttrs().getSize(),
+//                                LocalDateTime.ofInstant(new Date((long)t.getAttrs().getMTime() * 1000L).toInstant(), ZoneId.systemDefault())
+//                        )
+//                )
+//                .collect(Collectors.toList());
+//    }
+
+        //current feed version, filename only  **********
+//    public InputStream getFile(String remotePath) throws SftpException {
+//        String name = FilenameUtils.getName(remotePath);
+//        return channel.get(name);
+//    }
 
     /* deleteFile, cd, mkdir methods now re-commented out,
      * put method remains uncommented for use in DataGenerator

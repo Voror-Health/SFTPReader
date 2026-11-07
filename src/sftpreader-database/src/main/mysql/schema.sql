@@ -31,7 +31,7 @@ CREATE TABLE interface_type
   data_frequency_days int not null COMMENT 'how often we expect data in days',
   CONSTRAINT interfacetype_interfacetypeid_pk PRIMARY KEY (interface_type_id),
   CONSTRAINT interfacetype_interfacetypename_uq UNIQUE (interface_type_name)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE interface_file_type
 (
@@ -41,7 +41,7 @@ CREATE TABLE interface_file_type
   CONSTRAINT interfacefiletype_interfacetypeid_fk FOREIGN KEY (interface_type_id)
       REFERENCES interface_type (interface_type_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE configuration
 (
@@ -58,7 +58,7 @@ CREATE TABLE configuration
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT configurationfriendlyname_uq UNIQUE (configuration_friendly_name),
   CONSTRAINT configurationid_interfacetypeid_uq UNIQUE (configuration_id, interface_type_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE configuration_kvp
 (
@@ -69,7 +69,7 @@ CREATE TABLE configuration_kvp
   CONSTRAINT configurationkvp_configurationid_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE configuration_pgp
 (
@@ -83,7 +83,7 @@ CREATE TABLE configuration_pgp
   CONSTRAINT configurationpgp_configurationid_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE configuration_sftp
 (
@@ -100,7 +100,7 @@ CREATE TABLE configuration_sftp
   CONSTRAINT configurationsftp_configurationid_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE configuration_eds
 (
@@ -116,7 +116,7 @@ CREATE TABLE configuration_eds
   shared_storage_path varchar(255),
   CONSTRAINT configuration_eds_singlerowlock_pk PRIMARY KEY (single_row_lock),
   CONSTRAINT configuration_eds_singlerowlock_ck CHECK (single_row_lock = true)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 
 CREATE TABLE emis_organisation_map
@@ -125,7 +125,7 @@ CREATE TABLE emis_organisation_map
   name varchar(255) NOT NULL,
   ods_code varchar(255) NOT NULL,
   CONSTRAINT configuration_emisorganisationmap_guid_pk PRIMARY KEY (guid)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE INDEX emisorganisationmap_guid_ix
   ON emis_organisation_map (guid);
@@ -137,7 +137,7 @@ CREATE TABLE instance
   http_management_port integer,
   last_config_get_date datetime,
   CONSTRAINT configuration_instance_instancename_pk PRIMARY KEY (instance_name)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE instance_configuration
 (
@@ -151,14 +151,14 @@ CREATE TABLE instance_configuration
       REFERENCES instance (instance_name) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT instanceconfiguration_configurationid_uq UNIQUE (configuration_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE tpp_organisation_map
 (
   ods_code varchar(255) NOT NULL,
   name varchar(255) NOT NULL,
   CONSTRAINT tpporganisationmap_guid_pk PRIMARY KEY (ods_code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE batch
 (
@@ -180,7 +180,7 @@ CREATE TABLE batch
   CONSTRAINT batch_configurationid_batchid_uq UNIQUE (configuration_id, batch_id),
   -- CONSTRAINT batch_configurationid_batchidentifier_uq UNIQUE (configuration_id, batch_identifier), now allow multiple batches with the same ID
   CONSTRAINT batch_configurationid_sequencenumber_uq UNIQUE (configuration_id, sequence_number)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=Compressed;
 
 CREATE INDEX ix_batch_configuration_identifer on batch (configuration_id, batch_identifier);
 
@@ -204,7 +204,7 @@ CREATE TABLE batch_file
       REFERENCES batch (batch_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT batchfile_batchid_filename_uq UNIQUE (batch_id, filename)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=Compressed;
 
 ALTER TABLE batch_file MODIFY COLUMN batch_file_id INT auto_increment;
 
@@ -224,7 +224,7 @@ CREATE TABLE batch_split
       REFERENCES batch (configuration_id, batch_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT log_batchsplit_configurationid_batchid_batchsplitid_uq UNIQUE (configuration_id, batch_id, batch_split_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=Compressed;
 
 ALTER TABLE batch_split MODIFY COLUMN batch_split_id INT auto_increment;
 
@@ -249,7 +249,7 @@ CREATE TABLE notification_message
       REFERENCES batch_split (configuration_id, batch_id, batch_split_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT notificationmessage_messageuuid_uq UNIQUE (message_uuid)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 ROW_FORMAT=Compressed;
 
 ALTER TABLE notification_message MODIFY COLUMN notification_message_id INT auto_increment;
 
@@ -270,7 +270,7 @@ CREATE TABLE unknown_file
   CONSTRAINT unknownfile_configurationid_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 ALTER TABLE unknown_file MODIFY COLUMN unknown_file_id INT auto_increment;
 
@@ -287,7 +287,7 @@ CREATE TABLE configuration_polling_attempt (
 	CONSTRAINT configuration_polling_attempt_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE TABLE adastra_organisation_map (
   ods_code varchar(255) NOT NULL,
@@ -297,17 +297,16 @@ CREATE TABLE adastra_organisation_map (
   CONSTRAINT adastra_organisation_map_fk FOREIGN KEY (configuration_id)
       REFERENCES configuration (configuration_id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE INDEX ix_adastra_organisation_map_configuration ON adastra_organisation_map (configuration_id, file_name_org_code);
-
 
 CREATE TABLE tpp_organisation_gms_registration_map (
   organisation_id		varchar(20),
   patient_id bigint,
   gms_organisation_id	varchar(20),
   CONSTRAINT tpp_organisation_gms_registration_map_pk PRIMARY KEY (organisation_id, patient_id, gms_organisation_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 CREATE INDEX tpp_organisation_gms_registration_map_organisation_id_ix
   ON tpp_organisation_gms_registration_map
@@ -317,5 +316,4 @@ CREATE TABLE configuration_paused_notifying (
 	`configuration_id` varchar(255) NOT NULL,
     dt_paused datetime DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`configuration_id`)
-);
-
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;

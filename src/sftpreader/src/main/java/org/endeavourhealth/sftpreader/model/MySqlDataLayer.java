@@ -1374,7 +1374,7 @@ public class MySqlDataLayer implements DataLayerI {
     }
 
     @Override
-    public ConfigurationPollingAttempt getLastPollingAttempt(String configurationId) throws Exception {
+    public List<ConfigurationPollingAttempt> getLastPollingAttempts(String configurationId, int limit) throws Exception {
         Connection connection = getConnection();
         PreparedStatement ps = null;
         try {
@@ -1383,31 +1383,33 @@ public class MySqlDataLayer implements DataLayerI {
                     + " FROM configuration_polling_attempt"
                     + " WHERE configuration_id = ?"
                     + " ORDER BY attempt_started DESC"
-                    + " LIMIT 1";
+                    + " LIMIT ?";
 
             ps = connection.prepareStatement(sql);
 
             ps.setString(1, configurationId);
+            ps.setInt(2, limit);
+
+            List<ConfigurationPollingAttempt> ret = new ArrayList<>();
 
             ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
+            while (rs.next()) {
 
                 int col = 1;
 
-                ConfigurationPollingAttempt ret = new ConfigurationPollingAttempt();
-                ret.setConfigurationId(rs.getString(col++));
-                ret.setAttemptStarted(new Date(rs.getTimestamp(col++).getTime()));
-                ret.setAttemptFinished(new Date(rs.getTimestamp(col++).getTime()));
-                ret.setErrorText(rs.getString(col++));
-                ret.setFilesDownloaded(rs.getInt(col++));
-                ret.setBatchesCompleted(rs.getInt(col++));
-                ret.setBatchSplitsNotifiedOk(rs.getInt(col++));
-                ret.setBatchSplitsNotifiedFailure(rs.getInt(col++));
-                return ret;
-
-            } else {
-                return null;
+                ConfigurationPollingAttempt a = new ConfigurationPollingAttempt();
+                a.setConfigurationId(rs.getString(col++));
+                a.setAttemptStarted(new Date(rs.getTimestamp(col++).getTime()));
+                a.setAttemptFinished(new Date(rs.getTimestamp(col++).getTime()));
+                a.setErrorText(rs.getString(col++));
+                a.setFilesDownloaded(rs.getInt(col++));
+                a.setBatchesCompleted(rs.getInt(col++));
+                a.setBatchSplitsNotifiedOk(rs.getInt(col++));
+                a.setBatchSplitsNotifiedFailure(rs.getInt(col++));
+                ret.add(a);
             }
+
+            return ret;
 
         } finally {
             if (ps != null) {

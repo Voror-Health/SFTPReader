@@ -1,26 +1,40 @@
 package org.endeavourhealth.sftpreader.implementations.tpp;
 
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.io.FilenameUtils;
 import org.endeavourhealth.common.utility.FileHelper;
 import org.endeavourhealth.sftpreader.implementations.SftpBatchValidator;
 import org.endeavourhealth.sftpreader.implementations.tpp.utility.ManifestRecord;
 import org.endeavourhealth.sftpreader.implementations.tpp.utility.TppConstants;
 import org.endeavourhealth.sftpreader.model.DataLayerI;
-import org.endeavourhealth.sftpreader.model.db.*;
+import org.endeavourhealth.sftpreader.model.db.Batch;
+import org.endeavourhealth.sftpreader.model.db.BatchFile;
+import org.endeavourhealth.sftpreader.model.db.DbConfiguration;
+import org.endeavourhealth.sftpreader.model.db.DbInstanceEds;
 import org.endeavourhealth.sftpreader.model.exceptions.SftpValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 public class TppBatchValidator extends SftpBatchValidator {
     private static final Logger LOG = LoggerFactory.getLogger(TppBatchValidator.class);
 
     public static final String APPOINTMENT_ATTENDEES = "SRAppointmentAttendees";
     public static final String REFERRAL_CONTACT_EVENT = "SRReferralContactEvent";
+    public static final String CTV3_TO_SNOMED = "SRCtv3ToSnomed";
+    public static final String CTV3_TO_VERSION_2 = "SRCtv3ToVersion2";
+    public static final String CTV3_HIERARCHY = "SRCtv3Hierarchy";
+    public static final String CTV3 = "SRCtv3";
+    public static final String MEDICATION_READ_CODE_DETAILS = "SRMedicationReadCodeDetails";
+
+
+
+
+
+
 
     @Override
     public boolean validateBatch(Batch incompleteBatch, Batch lastCompleteBatch, DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration, DataLayerI db) throws SftpValidationException {
@@ -65,9 +79,15 @@ public class TppBatchValidator extends SftpBatchValidator {
             Date dEnd = newRecord.getDateTo();
             Date dStart = newRecord.getDateFrom();
 
-            //there's something consistently wrong with these couple of file types, with it not having any dates, so just skip it
+            //there's something consistently wrong with these file types, with it not having any dates, so just skip it
+            //SD-909: Added reference files which are semi-regularly being sent without dates and stopping the pipeline
             if (file.equals(APPOINTMENT_ATTENDEES)
-                    || file.equals(REFERRAL_CONTACT_EVENT)) {
+                    || file.equals(REFERRAL_CONTACT_EVENT)
+                    || file.equals(CTV3_TO_SNOMED)
+                    || file.equals(CTV3_TO_VERSION_2)
+                    || file.equals(CTV3)
+                    || file.equals(CTV3_HIERARCHY)
+                    || file.equals(MEDICATION_READ_CODE_DETAILS)) {
                 continue;
             }
 

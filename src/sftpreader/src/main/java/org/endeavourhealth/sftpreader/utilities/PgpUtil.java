@@ -73,15 +73,23 @@ public class PgpUtil {
         else
             pgpEncryptedDataList = (PGPEncryptedDataList)pgpObjectFactory.nextObject();
 
-        Iterator<PGPPublicKeyEncryptedData> encryptedDataIterator = pgpEncryptedDataList.getEncryptedDataObjects();
+        //Iterator<PGPPublicKeyEncryptedData> encryptedDataIterator = pgpEncryptedDataList.getEncryptedDataObjects();
+        Iterator<PGPEncryptedData> encryptedDataIterator = pgpEncryptedDataList.getEncryptedDataObjects();
         PGPPrivateKey pgpPrivateKey = null;
         PGPPublicKeyEncryptedData pgpPublicKeyEncryptedData = null;
+        PGPEncryptedData pgpEncryptedData = null;
         PGPSecretKeyRingCollection pgpSecretKeyRingCollection = new PGPSecretKeyRingCollection(PGPUtil.getDecoderStream(secretKeyIn), new JcaKeyFingerprintCalculator());
 
         while (pgpPrivateKey == null && encryptedDataIterator.hasNext())
         {
-            pgpPublicKeyEncryptedData = encryptedDataIterator.next();
+            //pgpPublicKeyEncryptedData = encryptedDataIterator.next();
+            pgpEncryptedData = encryptedDataIterator.next();
+            if (pgpEncryptedData instanceof PGPPublicKeyEncryptedData) {
 
+                pgpPublicKeyEncryptedData = (PGPPublicKeyEncryptedData) pgpEncryptedData;
+            } else {
+                continue;
+            }
             pgpPrivateKey = findSecretKey(pgpSecretKeyRingCollection, pgpPublicKeyEncryptedData.getKeyID(), secretKeyPassword.toCharArray());
         }
 

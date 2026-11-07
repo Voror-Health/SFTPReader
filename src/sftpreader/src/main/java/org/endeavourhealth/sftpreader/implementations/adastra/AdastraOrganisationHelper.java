@@ -2,6 +2,7 @@ package org.endeavourhealth.sftpreader.implementations.adastra;
 
 import org.endeavourhealth.common.ods.OdsOrganisation;
 import org.endeavourhealth.common.ods.OdsWebService;
+import org.endeavourhealth.common.utility.InternetProxyHelper;
 import org.endeavourhealth.common.utility.SlackHelper;
 import org.endeavourhealth.sftpreader.implementations.SftpOrganisationHelper;
 import org.endeavourhealth.sftpreader.model.DataLayerI;
@@ -18,7 +19,7 @@ public class AdastraOrganisationHelper extends SftpOrganisationHelper {
         try {
             //SFTP Reader instance needs a proxy to connect to the internet, so get it from the SlackHelper
             //which has the proxy settings in its config JSON
-            Proxy proxy = SlackHelper.getProxy();
+            Proxy proxy = InternetProxyHelper.getProxy();
             OdsOrganisation odsOrg = OdsWebService.lookupOrganisationViaRest(odsCode, proxy);
             if (odsOrg != null) {
                 return odsOrg.getOrganisationName();

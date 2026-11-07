@@ -1,9 +1,8 @@
 package org.endeavourhealth.sftpreader.implementations.adastra;
 
-import org.apache.commons.csv.CSVFormat;
+import com.google.common.base.Strings;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.io.FilenameUtils;
 import org.endeavourhealth.common.utility.FileHelper;
 import org.endeavourhealth.sftpreader.implementations.SftpBatchSplitter;
@@ -17,10 +16,7 @@ import org.endeavourhealth.sftpreader.utilities.RemoteFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.StringReader;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
@@ -59,6 +55,9 @@ public class AdastraBatchSplitter extends SftpBatchSplitter {
         String splitTempDir = FilenameUtils.concat(tempDir, configurationDir);
         splitTempDir = FilenameUtils.concat(splitTempDir, batchDir);
         splitTempDir = FilenameUtils.concat(splitTempDir, SPLIT_FOLDER);
+
+        //SD-485 find the case questions file and fix any invalid characters if detected
+        findAndFixCaseQuestionsFile(batch, sourcePermDir, splitTempDir);
 
         LOG.trace("Splitting CSV files to " + splitTempDir);
 
@@ -360,5 +359,78 @@ public class AdastraBatchSplitter extends SftpBatchSplitter {
         throw new Exception("Failed to find " + AdastraConstants.FILE_ID_CASE + " file in batch " + batch.getBatchId());
     }
 
+    /*
+        This function is a temp fix for SD-485.  Advanced have started sending invalid characters in
+        the CASEQUESTIONS file.  The known about invalid cell text is (note the extra "):
 
+        "Have you recently or are currently taking any steroid medication?""
+
+        The function finds and downloads the case questions file, detects any invalid text and replaces it
+        with the extra " removed. It is then re uploaded back to storage for the remainder of the file
+        splitting process to happen.
+    */
+    private static void findAndFixCaseQuestionsFile(Batch batch, String sourcePermDir, String splitTempDir) throws Exception {
+
+        String caseQuestionsFilePermPath = null;
+        String caseQuestionsFileTempPath = null;
+        for (BatchFile batchFile: batch.getBatchFiles()) {
+
+            String fileType = batchFile.getFileTypeIdentifier();
+            if (fileType.equals(AdastraConstants.FILE_ID_CASE_QUESTIONS)) {
+
+                caseQuestionsFilePermPath = FilenameUtils.concat(sourcePermDir, batchFile.getFilename());
+                caseQuestionsFileTempPath = FilenameUtils.concat(splitTempDir, batchFile.getFilename());
+                break;
+            }
+        }
+        //if the file is not found then no point continuing
+        if (Strings.isNullOrEmpty(caseQuestionsFilePermPath)) {
+            return;
+        }
+        LOG.trace("Validating raw CASEQUESTIONS file: " + caseQuestionsFilePermPath);
+        File dstDir = new File(splitTempDir);
+
+        //if the temp folder does exist, we want to make sure that all previous content is deleted
+        FileHelper.deleteRecursiveIfExists(dstDir);
+        FileHelper.createDirectoryIfNotExists(dstDir);
+
+        //copy the case file from S3 to the local temp dir
+        LOG.debug("Copying from " + caseQuestionsFilePermPath + " to " + caseQuestionsFileTempPath);
+        InputStream is = FileHelper.readFileFromSharedStorage(caseQuestionsFilePermPath);
+        Files.copy(is, new File(caseQuestionsFileTempPath).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        is.close();
+
+        //load the raw file as text and replace the invalid text if it exists
+        boolean caseFileModified = false;
+        String invalidText = "\"Have you recently or are currently taking any steroid medication?\"\"";
+        String validText = "\"Have you recently or are currently taking any steroid medication?\"";
+        BufferedReader file = new BufferedReader(new FileReader(caseQuestionsFileTempPath));
+        StringBuilder inputBuilder = new StringBuilder();
+        String line;
+        int count = 0;
+        while ((line = file.readLine()) != null) {
+            count++;
+            if (line.contains(invalidText)) {
+                // replace the invalid text with the valid text
+                line = line.replace(invalidText, validText);
+                //LOG.debug("Line: "+count+", replaced invalid text: "+invalidText);
+                caseFileModified = true;
+            }
+            inputBuilder.append(line).append("\n");
+        }
+        file.close();
+
+        //if the file text been updated then write the new file string data with the replaced line data OVER
+        //the same file and upload back to S3 / perm storage
+        if (caseFileModified) {
+
+            FileOutputStream fileOut = new FileOutputStream(caseQuestionsFileTempPath);
+            fileOut.write(inputBuilder.toString().getBytes());
+            fileOut.close();
+
+            //save file back to perm storage from local temp if modified
+            LOG.debug("Copying fixed CASEQUESTIONS file from " + caseQuestionsFileTempPath + " to " + caseQuestionsFilePermPath);
+            FileHelper.writeFileToSharedStorage(caseQuestionsFilePermPath, new File(caseQuestionsFileTempPath));
+        }
+    }
 }

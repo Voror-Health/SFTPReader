@@ -50,12 +50,14 @@ public class VisionBulkDetector extends SftpBulkDetector {
 
         InputStreamReader reader = FileHelper.readFileReaderFromSharedStorage(patientFilePath);
         CSVParser csvParser = new CSVParser(reader, VisionConstants.CSV_FORMAT); //no headers in file
+        Integer columnCount = null;
+        Long currentRecord = null;
 
         try {
-            Integer columnCount = null;
             Iterator<CSVRecord> iterator = csvParser.iterator();
             while (iterator.hasNext()) {
                 CSVRecord record = iterator.next();
+                currentRecord = new Long(record.getRecordNumber());
 
                 //Vision files don't contain headers, so we need to work out what column is what
                 if (columnCount == null) {
@@ -74,6 +76,10 @@ public class VisionBulkDetector extends SftpBulkDetector {
                     return false;
                 }
             }
+
+        } catch (Exception ex) {
+            throw new Exception("Exception checking " + patientFilePath + " with " + columnCount + " columns, on record " + currentRecord, ex);
+
         } finally {
             csvParser.close();
         }
@@ -88,11 +94,14 @@ public class VisionBulkDetector extends SftpBulkDetector {
         int journalRecords = 0;
         reader = FileHelper.readFileReaderFromSharedStorage(journalFilePath);
         csvParser = new CSVParser(reader, VisionConstants.CSV_FORMAT); //no headers in file
+        columnCount = null;
+        currentRecord = null;
+
         try {
-            Integer columnCount = null;
             Iterator<CSVRecord> iterator = csvParser.iterator();
             while (iterator.hasNext()) {
                 CSVRecord record = iterator.next();
+                currentRecord = new Long(record.getRecordNumber());
 
                 //Vision files don't contain headers, so we need to work out what column is what
                 if (columnCount == null) {
@@ -130,8 +139,11 @@ public class VisionBulkDetector extends SftpBulkDetector {
                     return false;
                 }*/
 
-                journalRecords ++;
+                journalRecords++;
             }
+        } catch (Exception ex) {
+            throw new Exception("Exception checking " + journalFilePath + " with " + columnCount + " columns, on record " + currentRecord, ex);
+
         } finally {
             csvParser.close();
         }

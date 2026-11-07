@@ -25,10 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.InputStreamReader;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class TppBulkDetector extends SftpBulkDetector {
     private static final Logger LOG = LoggerFactory.getLogger(TppBulkDetector.class);
@@ -51,23 +48,26 @@ public class TppBulkDetector extends SftpBulkDetector {
         boolean manifestIsBulk = manifestBulkReason == null;
         boolean filesLookBulk = filesLookBulkReason == null;
 
-        //if the match, then we're good
-        if (manifestIsBulk == filesLookBulk) {
-            return manifestIsBulk;
+        //SD-416 - if the manifest says we're a bulk then verify that we have content in certain key files. We had a bulk extract
+        //where SRManifest said that SRPatient was a bulk, but the file was simply empty of content
+        if (manifestIsBulk) {
+            checkKeyFilesForContent(batch, batchSplit, db, instanceConfiguration, dbConfiguration);
         }
 
-        String msg = "Possible discrepancy between SRManifest (bulk = " + manifestIsBulk + ") and file content (bulk = " + filesLookBulk + ") for "
-                + batchSplit.getOrganisationId() + " batch " + batch.getBatchIdentifier();
-        if (!manifestIsBulk) {
-            msg += "\r\nSRManifest states " + manifestBulkReason;
+        //if they don't match, then raise an alert
+        if (manifestIsBulk != filesLookBulk) {
+            String msg = "Possible discrepancy between SRManifest (bulk = " + manifestIsBulk + ") and file content (bulk = " + filesLookBulk + ") for "
+                    + batchSplit.getOrganisationId() + " batch " + batch.getBatchIdentifier();
+            if (!manifestIsBulk) {
+                msg += "\r\nSRManifest states " + manifestBulkReason;
+            }
+            if (!filesLookBulk) {
+                msg += "\r\nData not a bulk because " + filesLookBulkReason;
+            }
+            msg += "\r\nManifest content bulk state will be used";
+            LOG.error(msg);
+            SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, msg);
         }
-        if (!filesLookBulk) {
-            msg += "\r\nData not a bulk because " + filesLookBulkReason;
-        }
-        msg += "\r\nManifest content bulk state will be used";
-        LOG.warn(msg);
-
-        SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, msg);
 
         //trust the manifest
         return manifestIsBulk;
@@ -80,7 +80,7 @@ public class TppBulkDetector extends SftpBulkDetector {
         fileTypeIds.add(TppConstants.FILE_ID_EVENT);
         fileTypeIds.add(TppConstants.FILE_ID_CODE);
 
-        for (String fileTypeId: fileTypeIds) {
+        for (String fileTypeId : fileTypeIds) {
 
             String path = TppHelper.findPostSplitFileInTempDir(instanceConfiguration, dbConfiguration, batchSplit, fileTypeId);
             if (!Strings.isNullOrEmpty(path)) {
@@ -115,7 +115,7 @@ public class TppBulkDetector extends SftpBulkDetector {
      * returns NULL is it looked like a bulk, and a String saying why it doesn't
      */
     private static String detectBulkFromFileContents(Batch batch, BatchSplit batchSplit, DataLayerI db,
-                                               DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration) throws Exception {
+                                                     DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration) throws Exception {
 
         //the files will still be in our temp storage
         String patientFilePath = TppHelper.findPostSplitFileInTempDir(instanceConfiguration, dbConfiguration, batchSplit, TppConstants.FILE_ID_PATIENT);
@@ -192,7 +192,7 @@ public class TppBulkDetector extends SftpBulkDetector {
                     }
                 }
 
-                observationRecords ++;
+                observationRecords++;
             }
         } finally {
             csvParser.close();
@@ -207,7 +207,7 @@ public class TppBulkDetector extends SftpBulkDetector {
     }
 
     private static String detectBulkFromManifest(Batch batch, BatchSplit batchSplit, DataLayerI db,
-                                               DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration) throws Exception {
+                                                 DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration) throws Exception {
 
         //the SRManifest file will still be in our temp storage
         String manifestPath = TppHelper.findPostSplitFileInTempDir(instanceConfiguration, dbConfiguration, batchSplit, TppConstants.FILE_ID_MANIFEST);
@@ -225,7 +225,7 @@ public class TppBulkDetector extends SftpBulkDetector {
 
 
         List<ManifestRecord> records = ManifestRecord.readManifestFile(f);
-        for (ManifestRecord record: records) {
+        for (ManifestRecord record : records) {
             String fileName = record.getFileNameWithExtension();
             if (fileName.equals(TppConstants.PATIENT_FILE)) {
                 patientFound = true;
@@ -246,7 +246,7 @@ public class TppBulkDetector extends SftpBulkDetector {
         } else if (!codeFound) {
             return "No SRCode file listed";
 
-        } else if  (!patientBulk && !codeBulk) {
+        } else if (!patientBulk && !codeBulk) {
             return "SRPatient and SRCode are deltas";
 
         } else if (!patientBulk) {
@@ -258,6 +258,41 @@ public class TppBulkDetector extends SftpBulkDetector {
         } else {
             //indicates it IS a bulk
             return null;
+        }
+    }
+
+    /**
+     * checks that there's content in the files we would 100% expect to have content when it's a bulk extract
+     */
+    private static void checkKeyFilesForContent(Batch batch, BatchSplit batchSplit, DataLayerI db,
+                                                 DbInstanceEds instanceConfiguration, DbConfiguration dbConfiguration) throws Exception {
+
+        List<String> fileTypes = new ArrayList<>();
+        fileTypes.add(TppConstants.FILE_ID_PATIENT);
+        fileTypes.add(TppConstants.FILE_ID_PATIENT_ADDRESS_HISTORY);
+        fileTypes.add(TppConstants.FILE_ID_PATIENT_CONTACT_DETAILS);
+        fileTypes.add(TppConstants.FILE_ID_PATIENT_REGISTRATION);
+        fileTypes.add(TppConstants.FILE_ID_EVENT);
+        fileTypes.add(TppConstants.FILE_ID_CODE);
+
+        List<String> warnings = new ArrayList<>();
+
+        for (String fileType: fileTypes) {
+
+            //we just need to check if there's a file in the post-split temp directory. If not, then
+            //whether there was a file or not, there was nothing in the file for this organisation
+            String filePath = TppHelper.findPostSplitFileInTempDir(instanceConfiguration, dbConfiguration, batchSplit, fileType);
+            if (Strings.isNullOrEmpty(filePath)) {
+                warnings.add("No " + fileType + " content was found");
+                continue;
+            }
+        }
+
+        if (!warnings.isEmpty()) {
+            String msg = "Potential missing data in bulk extract for " + batchSplit.getOrganisationId() + " from " + batch.getBatchIdentifier() + ":\r\n"
+                    + String.join("\r\n", warnings);
+            LOG.error(msg);
+            SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, msg);
         }
     }
 }

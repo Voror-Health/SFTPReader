@@ -24,29 +24,42 @@ public class ProcessingIdSet {
         return Integer.toString(getProcessingIdStart()) + "-" + Integer.toString(getProcessingIdEnd());
     }
 
-    public static ProcessingIdSet parseBatchIdentifier(String batchIdentifier) throws SftpFilenameParseException {
-        if (StringUtils.isBlank(batchIdentifier))
+    /**
+     * the start of the filename contains either a single processing ID integer, or an ID range, with a dash between the ints
+     */
+    public static ProcessingIdSet parseProcessingIdRangeFromFileName(String batchIdentifier) throws SftpFilenameParseException {
+        if (StringUtils.isBlank(batchIdentifier)) {
             throw new SftpFilenameParseException("No processing ids present");
+        }
 
         String[] processingIdParts = batchIdentifier.split("-");
 
         int processingIdStart = Integer.parseInt(processingIdParts[0]);
+        int processingIdEnd = -1;
 
-        int processingIdEnd = processingIdStart;
+        if (processingIdParts.length == 1) {
+            //if only one int, then start and end are the same
+            processingIdEnd = processingIdStart;
 
-        if (processingIdParts.length == 2)
+        } else if (processingIdParts.length == 2) {
+            //if two ints, then end is the second token
             processingIdEnd = Integer.parseInt(processingIdParts[1]);
-        else if (processingIdParts.length > 2)
+
+        } else if (processingIdParts.length > 2) {
             throw new SftpFilenameParseException("Too many processing ids");
+        }
 
-        if (processingIdStart > processingIdEnd)
+        if (processingIdStart > processingIdEnd) {
             throw new SftpFilenameParseException("Processing id start is greater than processing id end");
+        }
 
-        if (processingIdStart < 0)
+        if (processingIdStart < 0) {
             throw new SftpFilenameParseException("Processing id start is less than zero");
+        }
 
-        if (processingIdEnd < 0)
+        if (processingIdEnd < 0) {
             throw new SftpFilenameParseException("Processing id end is less than zero");
+        }
 
         return new ProcessingIdSet(processingIdStart, processingIdEnd);
     }

@@ -1,6 +1,7 @@
 package org.endeavourhealth.sftpreader.implementations.emis;
 
 import com.google.common.base.Strings;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.endeavourhealth.sftpreader.implementations.SftpFilenameParser;
 import org.endeavourhealth.sftpreader.implementations.emis.utility.ProcessingIdSet;
@@ -54,28 +55,42 @@ public class EmisFilenameParser extends SftpFilenameParser {
         return false;
     }
 
-    /*@Override
-    public boolean requiresDecryption() {
-        return true;
-    }*/
 
     @Override
     protected void parseFilename(boolean isRawFile) throws SftpFilenameParseException {
 
+        String processingIdPart = null;
+        String schemaNamePart = null;
+        String tableNamePart = null;
+        String extractDateTimePart = null;
+
         String fileName = this.remoteFile.getFilename();
         String[] parts = fileName.split("_");
 
-        if (parts.length != 5) {
-            throw new SftpFilenameParseException("Emis batch filename could not be parsed");
+        //SD-374 with Emis moving to AWS they're changing the file name format to include an extra token
+        if (parts.length == 5) {
+            //the older format
+            processingIdPart = parts[0];
+            schemaNamePart = parts[1];
+            tableNamePart = parts[2];
+            extractDateTimePart = parts[3];
+            //sharingAgreementGuidWithFileExtensionPart = parts[4]; //not used here
+
+        } else if (parts.length == 6) {
+            //newer format
+            //bulkIndicator = parts[0]; //bulk/delta indicator, but not useful as still says delta when new bulks are added to existing extract
+            processingIdPart = parts[1];
+            schemaNamePart = parts[2];
+            tableNamePart = parts[3];
+            extractDateTimePart = parts[4];
+            //sharingAgreementGuidWithFileExtensionPart = parts[5]; //not used here
+
+        } else {
+            throw new SftpFilenameParseException("Emis filename [" + fileName + "] could not be parsed");
         }
 
-        String processingIdPart = parts[0];
-        String schemaNamePart = parts[1];
-        String tableNamePart = parts[2];
-        String extractDateTimePart = parts[3];
-        String sharingAgreementGuidWithFileExtensionPart = parts[4];
 
-        this.processingIds = ProcessingIdSet.parseBatchIdentifier(processingIdPart);
+        this.processingIds = ProcessingIdSet.parseProcessingIdRangeFromFileName(processingIdPart);
 
         if (StringUtils.isEmpty(schemaNamePart)) {
             throw new SftpFilenameParseException("Schema name is empty");
@@ -103,8 +118,8 @@ public class EmisFilenameParser extends SftpFilenameParser {
         return extractDateTime;
     }
 
-    public static String getDecryptedFileName(BatchFile batchFile, DbConfiguration dbConfiguration) {
-        return getDecryptedFileName(batchFile.getFilename(), dbConfiguration);
+    public static String getDecryptedFileName(BatchFile batchFile) {
+        return getDecryptedFileName(batchFile.getFilename());
     }
 
     /**
@@ -112,15 +127,20 @@ public class EmisFilenameParser extends SftpFilenameParser {
      * e.g. 291_Agreements_SharingOrganisation_20150211164536_45E7CD20-EE37-41AB-90D6-DC9D4B03D102.csv.gpg
      * so the decrypted filename is simply the filename with the gpg extension removed
      */
-    public static String getDecryptedFileName(String encryptedFilename, DbConfiguration dbConfiguration) {
-        String extension = dbConfiguration.getPgpFileExtensionFilter();
+    public static String getDecryptedFileName(String encryptedFilename) {
 
-        //on "transform" servers, we use unencrypted files as the source, so there's no encryption config
-        if (Strings.isNullOrEmpty(extension)) {
+        String extension = FilenameUtils.getExtension(encryptedFilename);
+        if (extension.equalsIgnoreCase("gpg")) {
+            //if the original file name is a GPG file, then just trim that off to get the decrypted file name
+            return FilenameUtils.removeExtension(encryptedFilename);
+
+        } else if (extension.equalsIgnoreCase("csv")) {
+            //if the original file was an unencrypted CSV (like we use on some pre-production servers) then just return the filename as is
             return encryptedFilename;
-        }
 
-        return StringUtils.removeEnd(encryptedFilename, extension);
+        } else {
+            throw new RuntimeException("Unexpected file extension on " + encryptedFilename);
+        }
     }
 
     @Override

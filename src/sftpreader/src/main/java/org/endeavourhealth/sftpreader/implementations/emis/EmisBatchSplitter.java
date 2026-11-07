@@ -190,7 +190,7 @@ public class EmisBatchSplitter extends SftpBatchSplitter {
         //the splitter only creates files when required, so we'll have incomplete file sets,
         //so create any missing files, so there's a full set of files in every folder
         for (BatchFile batchFile: batch.getBatchFiles()) {
-            String fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+            String fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
             String headers = headersCache.get(fileName);
 
             //iterate through any directories, creating any missing files in their sub-directories
@@ -510,6 +510,16 @@ public class EmisBatchSplitter extends SftpBatchSplitter {
                     continue;
                 }
 
+                //SD-562 - 16441 to X9V1R to 16441 and 16998 to P3V2T to 16998.
+                //These are clearly incorrect and should remain as X9V1R and P3V2T respectively.
+                //hence the ignore of ods of CDB 16441 and CDB 16998  in the org file until EMIS clarify the change reasoning.
+                if (orgOds.equalsIgnoreCase("16441")) {
+                    continue;
+                }
+                if (orgOds.equalsIgnoreCase("16998")) {
+                    continue;
+                }
+
                 //Validate that the ODS code isn't changing. We want to keep this table updated with name
                 //changes etc., but if the ODS code changes, then we need to understand what's happening and
                 //manually reconfigure the protocol to expect the new ODS code (and potentially move data)
@@ -558,7 +568,7 @@ public class EmisBatchSplitter extends SftpBatchSplitter {
 
         for (BatchFile batchFile: batch.getBatchFiles()) {
 
-            String fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+            String fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
 
             //first try to use a file in our temporary storage
             String filePath = FilenameUtils.concat(sourceTempDir, fileName);

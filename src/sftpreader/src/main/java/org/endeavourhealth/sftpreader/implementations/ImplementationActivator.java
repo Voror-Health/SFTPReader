@@ -39,7 +39,12 @@ public class ImplementationActivator {
         } else if (contentType.equalsIgnoreCase("BHRUTCSV")) {
             return "org.endeavourhealth.sftpreader.implementations.bhrut.Bhrut";
 
-        } else {
+        }  else if (contentType.equalsIgnoreCase("IMPERIALCSV")) {
+            return "org.endeavourhealth.sftpreader.implementations.imperial.Imperial";
+        } else if (contentType.equalsIgnoreCase("NEMSXML")){
+            return "org.endeavourhealth.sftpreader.implementations.nems.Nems";
+        }
+        else {
             throw new Exception("Unknown content type [" + contentType + "]");
         }
     }

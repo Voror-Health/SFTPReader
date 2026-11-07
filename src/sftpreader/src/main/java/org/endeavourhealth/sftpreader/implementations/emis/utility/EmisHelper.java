@@ -33,7 +33,7 @@ public class EmisHelper {
 
         for (BatchFile batchFile: batch.getBatchFiles()) {
             if (batchFile.getFileTypeIdentifier().equalsIgnoreCase(fileIdentifier)) {
-                fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+                fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
             }
         }
 
@@ -70,7 +70,7 @@ public class EmisHelper {
 
         for (BatchFile batchFile: batch.getBatchFiles()) {
             if (batchFile.getFileTypeIdentifier().equalsIgnoreCase(fileIdentifier)) {
-                fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+                fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
             }
         }
 
@@ -121,7 +121,7 @@ public class EmisHelper {
             String batchFileType = batchFile.getFileTypeIdentifier();
 
             if (batchFileType.equalsIgnoreCase(fileIdentifier)) {
-                fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+                fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
                 break;
             }
         }

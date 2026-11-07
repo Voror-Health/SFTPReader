@@ -39,8 +39,16 @@ public class SRCodeLoader {
      * one-off routine to populate the hash table sftp_reader_hashes.file_record_hash from SR Code file
      */
     public static void loadTppSRCodeIntoHashTable(Configuration configuration, String configurationId, String odsCodeRegex) throws Exception {
-        LOG.info("Starting the load for configuration ID " + configurationId + " restricting to " + odsCodeRegex);
+        loadTppFileIntoHashTable(configuration, configurationId, odsCodeRegex, TppConstants.CODE_FILE);
+    }
 
+    public static void loadTppSREventIntoHashTable(Configuration configuration, String configurationId, String odsCodeRegex) throws Exception {
+        loadTppFileIntoHashTable(configuration, configurationId, odsCodeRegex, TppConstants.EVENT_FILE);
+    }
+
+    private static void loadTppFileIntoHashTable(Configuration configuration, String configurationId, String odsCodeRegex, String fileNameToLoad) throws Exception {
+
+        LOG.info("Starting the load of " + fileNameToLoad + " for configuration ID " + configurationId + " restricting to " + odsCodeRegex);
         try {
             DbConfiguration dbConfiguration = null;
             for (DbConfiguration c : configuration.getConfigurations()) {
@@ -94,7 +102,7 @@ public class SRCodeLoader {
                     String fileDir = FileHelper.concatFilePath(sharedStoragePath, configurationPath, splitPath);
 
                     //make sure there's an SRCode file for this org
-                    String filePath = FileHelper.concatFilePath(fileDir, TppConstants.CODE_FILE);
+                    String filePath = FileHelper.concatFilePath(fileDir, fileNameToLoad);
                     List<String> files = FileHelper.listFilesInSharedStorage(fileDir);
                     if (files.contains(filePath)) {
 
@@ -108,7 +116,7 @@ public class SRCodeLoader {
                         for (FileInfo info: listing) {
                             String path = info.getFilePath();
                             String fileName = FilenameUtils.getName(path);
-                            if (fileName.equalsIgnoreCase(TppConstants.CODE_FILE)) {
+                            if (fileName.equalsIgnoreCase(fileNameToLoad)) {
                                 long size = info.getSize();
                                 if (size > 150 * 1024 * 1024) {
                                     LOG.debug("    file size " + FileUtils.byteCountToDisplaySize(size) + " so will stop processing any further files for " + odsCode);

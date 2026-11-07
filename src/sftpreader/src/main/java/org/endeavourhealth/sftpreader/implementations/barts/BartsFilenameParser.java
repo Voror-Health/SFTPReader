@@ -36,6 +36,8 @@ public class BartsFilenameParser extends SftpFilenameParser {
     public static final String TYPE_2_2_FAMILY_HISTORY = "FamilyHistory";
     public static final String TYPE_EMERGENCY_CARE = "SusEmergencyCareDataSet";
     public static final String TYPE_EMERGENCY_CARE_TAILS = "SusEmergencyCareDataSetTail";
+    public static final String TYPE_EMERGENCY_CARE_V2 = "SusEmergencyCareDataSetV2";
+    public static final String TYPE_EMERGENCY_CARE_TAILS_V2 = "SusEmergencyCareDataSetTailV2";
     public static final String TYPE_APPOINTMENT_SCHEDULING = "APPSL2";
     public static final String TYPE_EVENT_CODE = "EventCode";
     public static final String TYPE_EVENT_SET_CANON = "EventSetCanon";
@@ -222,11 +224,21 @@ public class BartsFilenameParser extends SftpFilenameParser {
             extractDate = lastModified.toLocalDate(); //filename doesn't have the date, so use the modified date
 
         } else if (tok1.equalsIgnoreCase("susecd")) {
-            fileTypeIdentifier = TYPE_EMERGENCY_CARE;
+
+            if (!ext.equalsIgnoreCase("csv")) {
+                fileTypeIdentifier = TYPE_EMERGENCY_CARE;
+            } else {
+                fileTypeIdentifier = TYPE_EMERGENCY_CARE_V2;  //after June 14th 2021, comma separated csv files
+            }
             extractDate = lastModified.toLocalDate(); //filename doesn't have the date, so use the modified date
 
         } else if (tok1.equalsIgnoreCase("tailecd")) {
-            fileTypeIdentifier = TYPE_EMERGENCY_CARE_TAILS;
+
+            if (!ext.equalsIgnoreCase("csv")) {
+                fileTypeIdentifier = TYPE_EMERGENCY_CARE_TAILS;
+            } else {
+                fileTypeIdentifier = TYPE_EMERGENCY_CARE_TAILS_V2;  //after June 14th 2021, same format, diff filename, so v2 to accompany main
+            }
             extractDate = lastModified.toLocalDate(); //filename doesn't have the date, so use the modified date
 
         } else if (tok1.equalsIgnoreCase("eve")) {

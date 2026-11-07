@@ -147,7 +147,8 @@ public class TppBatchSplitter extends SftpBatchSplitter {
         LOG.trace("Filtering duplicate data out of " + splitFiles.length + " files in " + orgDir);
         for (File splitFile : splitFiles) {
             String fileName = splitFile.getName();
-            if (fileName.equalsIgnoreCase(TppConstants.CODE_FILE)) {
+            if (fileName.equalsIgnoreCase(TppConstants.CODE_FILE)
+                    || fileName.equalsIgnoreCase(TppConstants.EVENT_FILE)) {
 
                 String uniqueKey = TppConstants.COL_ROW_IDENTIFIER_TPP;
 
@@ -160,19 +161,22 @@ public class TppBatchSplitter extends SftpBatchSplitter {
                 if (actuallyFilterFile) {
 
                     //we call this fn for every delta, so check the manifest to see if SRCode is telling us it's being re-bulked
-                    boolean srCodeRebulk = false;
+                    boolean specificFileRebulk = false;
                     File manifestFile = new File(orgDir, TppConstants.MANIFEST_FILE);
                     List<ManifestRecord> records = ManifestRecord.readManifestFile(manifestFile);
                     for (ManifestRecord record: records) {
                         if (record.getFileNameWithExtension().equalsIgnoreCase(fileName)) {
-                            srCodeRebulk = !record.isDelta();
+                            specificFileRebulk = !record.isDelta();
                         }
                     }
 
-                    if (srCodeRebulk) {
+                    if (specificFileRebulk) {
                         String fileSizeDesc = FileUtils.byteCountToDisplaySize(splitFile.length());
-                        String msg = "TPP Re-bulk of SRCode detected in " + dbConfiguration.getConfigurationId() + " at " + fileSizeDesc + " for " + batchSplit.getOrganisationId();
-                        SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, msg);
+                        String msg = "TPP Re-bulk of " + fileName + " detected in " + dbConfiguration.getConfigurationId() + " at " + fileSizeDesc + " for " + batchSplit.getOrganisationId();
+
+                        //getting way too many of these in the alerts channel, and given we don't take any special action, we may as well send to the audit channel
+                        //SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderAlerts, msg);
+                        SlackHelper.sendSlackMessage(SlackHelper.Channel.SftpReaderReceipts, msg);
                     }
                 }
 

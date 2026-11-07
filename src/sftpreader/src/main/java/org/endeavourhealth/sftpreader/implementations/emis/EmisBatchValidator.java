@@ -69,7 +69,10 @@ public class EmisBatchValidator extends SftpBatchValidator {
             fileName = FilenameUtils.getBaseName(fileName);
 
             String[] toks = fileName.split("_");
-            String agreementStr = toks[4];
+            //SD-374 - need to support both old and new Emis file name formats, but both have the agreement as the last token
+            String agreementStr = toks[toks.length-1];
+            //String agreementStr = toks[4];
+
             UUID foundSharingAgreement = UUID.fromString(agreementStr);
             if (!foundSharingAgreement.equals(expectedSharingAgreement)) {
                 throw new SftpValidationException("Sharing agreement " + foundSharingAgreement + " does not match exepected UUID " + expectedSharingAgreement);
@@ -142,7 +145,7 @@ public class EmisBatchValidator extends SftpBatchValidator {
         String fileName = null;
         for (BatchFile batchFile: lastCompleteBatch.getBatchFiles()) {
             if (batchFile.getFileTypeIdentifier().equalsIgnoreCase(EmisConstants.SHARING_AGREEMENTS_FILE_TYPE)) {
-                fileName = EmisFilenameParser.getDecryptedFileName(batchFile, dbConfiguration);
+                fileName = EmisFilenameParser.getDecryptedFileName(batchFile);
             }
         }
 

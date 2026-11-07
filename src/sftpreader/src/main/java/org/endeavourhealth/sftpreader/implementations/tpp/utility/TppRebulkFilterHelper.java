@@ -10,7 +10,6 @@ import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.io.FilenameUtils;
 import org.endeavourhealth.common.utility.FileHelper;
-import org.endeavourhealth.common.utility.StringMemorySaver;
 import org.endeavourhealth.core.database.rdbms.ConnectionManager;
 import org.endeavourhealth.sftpreader.model.db.DbInstanceEds;
 import org.endeavourhealth.sftpreader.utilities.CsvSplitter;
@@ -23,7 +22,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 public class TppRebulkFilterHelper {
     private static final Logger LOG = LoggerFactory.getLogger(TppRebulkFilterHelper.class);
@@ -244,7 +246,7 @@ public class TppRebulkFilterHelper {
                 + "dt_last_updated datetime NOT NULL, "
                 + "CONSTRAINT pk PRIMARY KEY (record_id), "
                 + "INDEX ix_id_date  (record_id, dt_last_updated, record_hash)"
-                + ")"; //note no point adding compression as the hashes don't compress well
+                + ") ROW_FORMAT=COMPRESSED"; //adding additional compression following server migration SD-747
         Statement statement = connection.createStatement();
         statement.executeUpdate(sql);
     }

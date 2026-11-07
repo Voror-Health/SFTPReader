@@ -51,76 +51,53 @@ public class EmisBatchUnzipperDecrypter extends SftpBatchUnzipperDecrypter {
         for (BatchFile batchFile: batch.getBatchFiles()) {
 
             String encryptedFilename = batchFile.getFilename();
-
-            String encryptedExtension = dbConfiguration.getPgpFileExtensionFilter();
-            String decryptedFilename = StringUtils.removeEnd(encryptedFilename, encryptedExtension);
-
             String encryptedSourceFile = FilenameUtils.concat(storageDir, encryptedFilename);
-            String decryptedTempFile = FilenameUtils.concat(tempDir, decryptedFilename);
 
             InputStream inputStream = FileHelper.readFileFromSharedStorage(encryptedSourceFile);
+            try {
 
-            //on some of the "transform" servers, we use already decrypted Emis data as the source, so
-            //we don't have any encryption config. In this case, simply copy the source file into temp
-            //so the outcome is the same as it being decrypted
-            if (Strings.isNullOrEmpty(encryptedExtension)) {
+                String extension = FilenameUtils.getExtension(encryptedFilename);
+                if (extension.equalsIgnoreCase("csv")) {
 
-                try {
+                    //on some of the "transform" servers, we use already decrypted Emis data as the source, so
+                    //we don't have any encryption config. In this case, simply copy the source file into temp
+                    //so the outcome is the same as it being decrypted
+                    String decryptedTempFile = FilenameUtils.concat(tempDir, encryptedFilename);
+
                     LOG.info("   Copying w/o decryption to: " + decryptedTempFile);
                     Path destination = new File(decryptedTempFile).toPath();
                     Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
 
-                } finally {
-                    inputStream.close();
+                } else if (extension.equalsIgnoreCase("gpg")) {
+
+                    //if the file extension is GPG then we need to decrypt it
+                    String decryptedFilename = FilenameUtils.removeExtension(encryptedFilename); //the decrypted file name is the filename minus ".gpg"
+                    String decryptedTempFile = FilenameUtils.concat(tempDir, decryptedFilename);
+
+                    String privateKey = dbConfiguration.getPgpConfiguration().getPgpRecipientPrivateKey();
+                    String privateKeyPassword = dbConfiguration.getPgpConfiguration().getPgpRecipientPrivateKeyPassword();
+                    String publicKey = dbConfiguration.getPgpConfiguration().getPgpSenderPublicKey();
+
+                    LOG.info("   Decrypting file to: " + decryptedTempFile);
+                    PgpUtil.decryptAndVerify(inputStream, decryptedTempFile, privateKey, privateKeyPassword, publicKey);
+
+                    //also this is a good point to tag our GPG file so that our data retention policy thing works
+                    if (encryptedSourceFile.startsWith("S3")
+                            || encryptedSourceFile.startsWith("s3")) {
+                        Map<String, String> tags = new HashMap<>();
+                        tags.put("Emis", "raw");
+                        FileHelper.setPermanentStorageTags(encryptedSourceFile, tags);
+                    }
+
+                } else {
+                    //if not a CSV or GPG then something is wrong
+                    throw new RuntimeException("Unexpected Emis file extension on " + encryptedFilename);
                 }
-
-                continue;
-            }
-
-            //if this one has already been decrypted, skip it
-            //we delete the decrypted file after splitting, so it we're back in this function, we need to decrypt it again
-            /*if (batchFile.isDecrypted()) {
-                LOG.info("" + encryptedFilename + " has already been decrypted");
-                continue;
-            }*/
-
-
-            String privateKey = dbConfiguration.getPgpConfiguration().getPgpRecipientPrivateKey();
-            String privateKeyPassword = dbConfiguration.getPgpConfiguration().getPgpRecipientPrivateKeyPassword();
-            String publicKey = dbConfiguration.getPgpConfiguration().getPgpSenderPublicKey();
-
-            try {
-                LOG.info("   Decrypting file to: " + decryptedTempFile);
-                PgpUtil.decryptAndVerify(inputStream, decryptedTempFile, privateKey, privateKeyPassword, publicKey);
-
-                /*long decryptedFileSize = new File(decryptedTempFile).length();
-                batchFile.setDecryptedFilename(decryptedFilename);
-                batchFile.setDecryptedSizeBytes(decryptedFileSize);
-                db.setFileAsDecrypted(batchFile);*/
 
             } finally {
                 inputStream.close();
             }
 
-            //also this is a good point to tag our GPG file so that our data retention policy thing works
-            if (encryptedSourceFile.startsWith("S3")
-                    || encryptedSourceFile.startsWith("s3")) {
-                Map<String, String> tags = new HashMap<>();
-                tags.put("Emis", "raw");
-                FileHelper.setPermanentStorageTags(encryptedSourceFile, tags);
-            }
-
-            //if we're using separate temp and permanent storage, then we want to move the decrypted file into permanent storage
-            //taking out, since we store the split versions of the files in S3, there's no need to store the un-split versions too
-            /*if (!FilenameUtils.equals(sharedStoragePath, tempRootDir)) {
-
-                String decryptedPermanent = FilenameUtils.concat(sharedStoragePath, configurationDir);
-                decryptedPermanent = FilenameUtils.concat(decryptedPermanent, batchDir);
-                decryptedPermanent = FilenameUtils.concat(decryptedPermanent, decryptedFilename);
-
-                File decryptedSource = new File(decryptedTempFile);
-                FileHelper.writeFileToSharedStorage(decryptedPermanent, decryptedSource);
-            }*/
         }
     }
 }
