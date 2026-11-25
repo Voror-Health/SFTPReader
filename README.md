@@ -4,11 +4,6 @@ The Endeavour **SFTP Reader** (downloads, decrypts, splits and validates supplie
 Barts, Homerton, Adastra, BHRUT, Imperial, NEMS; then notifies the Messaging API), ported to
 **Java 21 / Tomcat 11 (Jakarta EE) / Casdoor**.
 
-Source: `D:\OpenCode\Voror-VHP\src\SFTPReader`. That copy is the Endeavour code (same as `D:\GithubBackup2\SFTPReader`,
-`vor-sync`) plus one fix in `EmisBatchSplitter` (deletes the individual split files rather than the shared
-ProcessingId directory). Packages stay `org.endeavourhealth.sftpreader.*`. The reader logic (`SftpReaderTask`,
-`implementations/*`, `model/*`, `utilities/*`, `sources/*`) is unchanged.
-
 ## What changed
 
 | Area | Original | Now |
@@ -191,16 +186,6 @@ java -jar sftpreader-1.0-SNAPSHOT.jar <instance>
   changed, because that library is no longer in the WAR.
 - Hibernate 5.2 (from common core) runs with javassist 3.30, as in vhp-messaging-api. The reader barely uses it (core DAL only).
 
-## Troubleshooting
-
-- **Batch notification fails with `HTTP 415 Unsupported Media Type`** (`EdsSenderHttpErrorResponseException` whose
-  body is a Tomcat error page): the reader posts the XML envelope as `text/xml`, and the Messaging API's
-  `PostMessageAsync` has no `@Consumes`, so it accepts any content type (guarded by its smoke test,
-  `postMessageAsyncAcceptsXmlEnvelopeLikeTheSftpReader`). A 415 means the request reached something that does not
-  accept it. Check that the `api` row's `api_url` points at the current vhp-messaging-api's
-  `/vhp-api/api/PostMessageAsync`, and that the WAR deployed there is a recent build. Probe without a token:
-  `POST .../vhp-api/api/PostMessage` must answer **410** with JSON `"error":"endpoint_retired"` (the current build,
-  for any content type); anything else means an old or different webapp is answering at that URL.
 
 ## Tests
 
@@ -215,10 +200,3 @@ java -jar sftpreader-1.0-SNAPSHOT.jar <instance>
 - `Tomcat11SmokeTest`: deploys the real `web.xml`/`context.xml` on embedded Tomcat 11 with a stand-in valve that
   applies web.xml's `protected_paths`/`required_roles`. It checks the 401/403/200 on `/api/status`, the open static page,
   that deployment doesn't wait for the reader, and that with no config DB the reader reports `FAILED` and undeploys cleanly.
-
-The stand-alone jar was started by hand (2026-11-16): the `DecryptGpg2` utility reaches BouncyCastle 1.86 from the
-jars beside it, and a reader start with no config DB gets as far as the config and database look-ups and then exits.
-
-**Not verified:** a real config DB, SFTP Reader DB, SFTP server, Casdoor, Messaging API or DataSteward, a real
-Tomcat 11 install, and the reader's actual download/decrypt/split/notify cycle on Java 21. That code is unchanged
-and compiles, but no extract has been processed by this build.
