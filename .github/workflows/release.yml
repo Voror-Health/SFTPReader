@@ -1,0 +1,99 @@
+# Builds vhp-sftpreader (Voror-Health/SFTPReader) on JDK 21 (tests included) against the libraries that Voror-Health/vhp-libraries publishes
+# to GitHub Packages. On a v* tag it publishes a GitHub release with the deployable files, the
+# database scripts and SHA256SUMS. That release is what the test-system deploy script downloads.
+#
+# Generated from D:\VHP\ci\app-release.yml.template by ci/generate-workflows.sh. Edit the template, not this copy.
+#
+# Reading another repository's packages: either grant this repository read access on each package's
+# "Manage Actions access" page in vhp-libraries (then GITHUB_TOKEN is enough), or add a repository
+# secret PACKAGES_READ_TOKEN (a fine-grained token with read:packages on the organisation).
+name: Build and release
+
+on:
+  push:
+    branches: [main, master, voror-java21]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the release
+  packages: read    # read the libraries from GitHub Packages
+
+env:
+  LIBS_REPO_URL: https://maven.pkg.github.com/Voror-Health/vhp-libraries
+  # Files to publish (globs, relative to the repository root). Each glob must match at least one file.
+  ASSETS: "target/vhp-sftpreader.war target/sftpreader-*.jar target/bc*.jar"
+  # Folders packed into <repo>-db.tar.gz (schema, migrations, seed SQL). Empty for none.
+  DB_DIRS: "db"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          overwrite-settings: false
+
+      # Credentials are read from the environment by Maven at run time; nothing secret is written to disk.
+      - name: Maven settings (library repository)
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings>
+            <!-- The Endeavour poms redefine the central and snapshots repository ids to
+                 maven.endeavourhealth.net, which no longer exists. Send both to Maven Central. -->
+            <mirrors><mirror><id>maven-central</id><mirrorOf>central,snapshots</mirrorOf>
+              <url>https://repo.maven.apache.org/maven2</url></mirror></mirrors>
+            <servers>
+              <server><id>github</id><username>\${env.GITHUB_ACTOR}</username><password>\${env.PACKAGES_TOKEN}</password></server>
+            </servers>
+            <profiles><profile><id>vhp-libraries</id><repositories>
+              <repository><id>github</id><url>${LIBS_REPO_URL}</url>
+                <releases><enabled>true</enabled></releases><snapshots><enabled>true</enabled></snapshots></repository>
+            </repositories></profile></profiles>
+            <activeProfiles><activeProfile>vhp-libraries</activeProfile></activeProfiles>
+          </settings>
+          EOF
+
+      # endeavour-cache.version: discovery-versions pins cache 1.5-SNAPSHOT, which only ever existed on the old
+      # Endeavour Artifactory; the source (and vhp-libraries) is 1.6-SNAPSHOT, with the same classes. Remove
+      # this once discovery-versions is corrected.
+      - name: Build and test
+        env:
+          PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || github.token }}
+        run: mvn -B -U -Dendeavour-cache.version=1.6-SNAPSHOT package
+
+      - name: Collect release files
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for g in $ASSETS; do
+            compgen -G "$g" >/dev/null || { echo "::error::no file matches $g"; exit 1; }
+            cp -v $g dist/
+          done
+          if [ -n "$DB_DIRS" ]; then
+            tar -czf "dist/${GITHUB_REPOSITORY#*/}-db.tar.gz" $DB_DIRS
+          fi
+          (cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/
+
+      - name: GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
+          fi

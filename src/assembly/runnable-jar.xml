@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The stand-alone SFTP Reader jar (java -jar sftpreader-1.0-SNAPSHOT.jar <instance>), built next to the WAR.
+    It is the equivalent of the original shaded jar: the reader's classes plus every runtime dependency,
+    except BouncyCastle. The BouncyCastle jars are signed and must stay intact, so they are copied beside
+    the jar and named in its manifest Class-Path (see the pom).
+
+    The maven-shade-plugin can't be used here because the project's main artifact is the WAR.
+-->
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <id>runnable</id>
+    <formats>
+        <format>jar</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <!-- merge META-INF/services files from all the dependencies (JDBC drivers, JAXB, Jackson modules, slf4j...) -->
+    <containerDescriptorHandlers>
+        <containerDescriptorHandler>
+            <handlerName>metaInf-services</handlerName>
+        </containerDescriptorHandler>
+    </containerDescriptorHandlers>
+
+    <!-- the reader's own classes go in first, so they win over any same-named class in a dependency -->
+    <fileSets>
+        <fileSet>
+            <directory>${project.build.outputDirectory}</directory>
+            <outputDirectory>/</outputDirectory>
+        </fileSet>
+    </fileSets>
+
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory>/</outputDirectory>
+            <useProjectArtifact>false</useProjectArtifact>
+            <unpack>true</unpack>
+            <scope>runtime</scope>
+            <excludes>
+                <exclude>org.bouncycastle:*</exclude>
+            </excludes>
+            <unpackOptions>
+                <excludes>
+                    <!-- other jars' signatures and manifests are meaningless once merged -->
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/*.EC</exclude>
+                    <exclude>META-INF/MANIFEST.MF</exclude>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/*/module-info.class</exclude>
+                </excludes>
+            </unpackOptions>
+        </dependencySet>
+    </dependencySets>
+</assembly>
