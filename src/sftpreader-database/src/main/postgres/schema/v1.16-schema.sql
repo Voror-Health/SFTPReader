@@ -1,1 +1,0 @@
-create index log_batchsplit_configurationid_localrelativepath on log.batch_split (configuration_id, local_relative_path);

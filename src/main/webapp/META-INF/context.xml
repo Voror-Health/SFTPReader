@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Context path="">
+    <!-- Casdoor authentication for /api/*. casdoor-tomcat-valve and its dependencies must be in
+         Tomcat's lib directory (same set-up as the other VHP apps). -->
+    <Valve className="org.voror.auth.casdoor.CasdoorAuthenticatorValve"/>
+</Context>

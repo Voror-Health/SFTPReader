@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+    <servlet>
+        <servlet-name>jersey-servlet</servlet-name>
+        <servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+        <init-param>
+            <param-name>jakarta.ws.rs.Application</param-name>
+            <param-value>org.endeavourhealth.sftpreader.web.JerseyApplication</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>jersey-servlet</servlet-name>
+        <url-pattern>/api/*</url-pattern>
+    </servlet-mapping>
+
+    <!--
+        Application id used to look up config (ConfigManager and the Casdoor valve both read
+        SELECT ... FROM config WHERE app_id = 'sftpreader', falling back to 'global').
+        Same app_id as the original jar (ConfigManager.initialize("sftpreader", <instance>)).
+        Rows used: auth (Casdoor valve + service token), datasteward (DataSteward URL for DPA checks and
+        the Casdoor service user, same format as vhp-messaging-api), api, storage and database (the reader's own MySQL database), plus the usual Endeavour rows (db_core..., logback, slack).
+    -->
+    <context-param>
+        <param-name>app_id</param-name>
+        <param-value>sftpreader</param-value>
+    </context-param>
+
+    <!--
+        SFTP Reader instance (row in the SFTP Reader instance table) this deployment runs. One deployment
+        per instance, as one JVM per instance before. Leave empty here and set it per deployment, e.g. in
+        conf/Catalina/localhost/vhp-sftpreader.xml:
+            <Context><Parameter name="instance_name" value="EMIS01" override="false"/></Context>
+        or with -DINSTANCE_NAME=... / the INSTANCE_NAME environment variable.
+    -->
+    <context-param>
+        <param-name>instance_name</param-name>
+        <param-value></param-value>
+    </context-param>
+
+    <!-- how long undeploy/shutdown waits for a running task to finish before interrupting it -->
+    <context-param>
+        <param-name>shutdown_wait_seconds</param-name>
+        <param-value>60</param-value>
+    </context-param>
+
+    <!--
+        Casdoor authentication: CasdoorAuthenticatorValve (META-INF/context.xml). It requires a valid
+        Casdoor bearer token (or gateway X-Session-Id) and one of required_roles on /api/*.
+        Static files (the status page) are open; the page asks for a token.
+    -->
+    <context-param>
+        <param-name>protected_paths</param-name>
+        <param-value>/api/</param-value>
+    </context-param>
+    <context-param>
+        <param-name>required_roles</param-name>
+        <param-value>vhp_service,vhp_ui_admin</param-value>
+    </context-param>
+
+    <listener>
+        <listener-class>org.endeavourhealth.sftpreader.web.SftpReaderContextListener</listener-class>
+    </listener>
+
+    <security-role>
+        <role-name>vhp_service</role-name>
+    </security-role>
+    <security-role>
+        <role-name>vhp_ui_admin</role-name>
+    </security-role>
+
+    <filter>
+        <filter-name>httpHeaderSecurity</filter-name>
+        <filter-class>org.apache.catalina.filters.HttpHeaderSecurityFilter</filter-class>
+        <async-supported>true</async-supported>
+        <init-param>
+            <param-name>hstsEnabled</param-name>
+            <param-value>true</param-value>
+        </init-param>
+        <init-param>
+            <param-name>hstsMaxAgeSeconds</param-name>
+            <param-value>31536000</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>httpHeaderSecurity</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>REQUEST</dispatcher>
+    </filter-mapping>
+
+    <welcome-file-list>
+        <welcome-file>index.html</welcome-file>
+    </welcome-file-list>
+
+</web-app>
